@@ -6,50 +6,61 @@ CreateThread(function()
     shells = data('shells')
     propertyTypes = data('propertyTypes')
 
-    MySQL.query('SELECT * FROM bnl_housing', function(result)
-        if result then
-            properties = {}
+    if db == 'ox' then
+        MySQL.query('SELECT * FROM bnl_housing', function(result)
+            if result then
+                processProperties(result)
+            end
+        end)
+    elseif db == 'async' then
+        MySQL.Async.fetchAll("SELECT * FROM bnl_housing", {}, function(result) 
+            if result then
+                processProperties(result)
+            end
+        end)
+    end
+end)
 
-            allPropertyLocations = {}
-            for _,property in pairs(result) do
-                local property_id = property.id
-                local entrance = json.decode(property.entrance)
-                entrance = vector4(entrance.x, entrance.y, entrance.z, entrance.w)
+function processProperties(result) 
+    properties = {}
 
-                table.insert(allPropertyLocations, {
-                    property_id = property_id,
-                    entrance = entrance,
-                })
+    allPropertyLocations = {}
+    for _,property in pairs(result) do
+        local property_id = property.id
+        local entrance = json.decode(property.entrance)
+        entrance = vector4(entrance.x, entrance.y, entrance.z, entrance.w)
 
-                property.shell = nil
-                property.saved_vehicles = json.decode(property.vehicles)
-                property.vehicles = nil
-                property.saved_players = json.decode(property.saved_players)
+        table.insert(allPropertyLocations, {
+            property_id = property_id,
+            entrance = entrance,
+        })
 
-                for _,shell in pairs(shells) do
-                    if (property.shell_id == shell.id) then
-                        property.shell = shell
-                        break
-                    end
-                end
-                if (property.shell ~= nil) then
-                    for propertyType, data in pairs(propertyTypes) do
-                        if (property.shell.type == propertyType) then
-                            property.type = data
-                            break
-                        end
-                    end
-                else
-                    Logger.Error('Shell not found for property #' .. property_id)
-                end
+        property.shell = nil
+        property.saved_vehicles = json.decode(property.vehicles)
+        property.vehicles = nil
+        property.saved_players = json.decode(property.saved_players)
 
-                properties[property_id] = property
+        for _,shell in pairs(shells) do
+            if (property.shell_id == shell.id) then
+                property.shell = shell
+                break
             end
         end
+        if (property.shell ~= nil) then
+            for propertyType, data in pairs(propertyTypes) do
+                if (property.shell.type == propertyType) then
+                    property.type = data
+                    break
+                end
+            end
+        else
+            Logger.Error('Shell not found for property #' .. property_id)
+        end
 
-        TriggerEvent('bnl-housing:event:onPropertiesLoaded', properties)
-    end)
-end)
+        properties[property_id] = property
+    end
+    TriggerEvent('bnl-housing:event:onPropertiesLoaded', properties)
+end
 
 lib.callback.register('bnl-housing:server:getAllPropertyLocations', function(source)
     return allPropertyLocations
@@ -397,11 +408,17 @@ RegisterNetEvent("bnl-housing:server:giveKeys", function(player_id)
         table.insert(key_owners, new_key_owner)
         property.key_owners = json.encode(key_owners)
 
-        MySQL.update("UPDATE `bnl_housing` SET `key_owners` = @key_owners WHERE `id` = @id", {
-            ['@key_owners'] = property.key_owners,
-            ['@id'] = property.id
-        })
-
+        if db == 'ox' then
+            MySQL.update("UPDATE `bnl_housing` SET `key_owners` = @key_owners WHERE `id` = @id", {
+                ['@key_owners'] = property.key_owners,
+                ['@id'] = property.id
+            })
+        elseif db == 'async' then
+            MySQL.Async.execute("UPDATE bnl_housing SET key_owners = @key_owners WHERE id = @id", {
+                ['@key_owners'] = property.key_owners,
+                ['@id'] = property.id
+            })
+        end
         TriggerClientEvent("bnl-housing:client:notify", _source, {
             title = locale('property'),
             description = locale('gave_keys', new_key_owner.name),
@@ -432,11 +449,17 @@ RegisterNetEvent("bnl-housing:server:takeKeys", function(player_id)
                 table.remove(key_owners, i)
                 property.key_owners = json.encode(key_owners)
 
-                MySQL.update("UPDATE `bnl_housing` SET `key_owners` = @key_owners WHERE `id` = @id", {
-                    ['@key_owners'] = property.key_owners,
-                    ['@id'] = property.id
-                })
-
+                if db == 'ox' then
+                    MySQL.update("UPDATE `bnl_housing` SET `key_owners` = @key_owners WHERE `id` = @id", {
+                        ['@key_owners'] = property.key_owners,
+                        ['@id'] = property.id
+                    })
+                elseif db == 'async' then
+                    MySQL.Async.execute("UPDATE bnl_housing SET key_owners = @key_owners WHERE id = @id", {
+                        ['@key_owners'] = property.key_owners,
+                        ['@id'] = property.id
+                    })
+                end
                 TriggerClientEvent("bnl-housing:client:notify", _source, {
                     title = locale('property'),
                     description = locale('taken_keys', key_owner.name),
@@ -502,10 +525,17 @@ AddEventHandler('playerDropped', function (reason)
 
     table.insert(property.saved_players, data)
 
-    MySQL.update("UPDATE `bnl_housing` SET `saved_players` = @saved_players WHERE `id` = @id", {
-        ['@saved_players'] = json.encode(property.saved_players),
-        ['@id'] = property.id
-    })
+    if db == 'ox' then
+        MySQL.update("UPDATE `bnl_housing` SET `saved_players` = @saved_players WHERE `id` = @id", {
+            ['@saved_players'] = json.encode(property.saved_players),
+            ['@id'] = property.id
+        })
+    elseif db == 'async' then
+        MySQL.Async.execute("UPDATE bnl_housing SET saved_players = @saved_players WHERE id = @id", {
+            ['@saved_players'] = json.encode(property.saved_players),
+            ['@id'] = property.id
+        })
+    end
 
     PlayerExitProperty(property, player)
     UpdateProperty(property)
@@ -532,11 +562,17 @@ RegisterNetEvent("bnl-housing:server:playerLoaded", function()
                 break
             end
         end
-
-        MySQL.update("UPDATE `bnl_housing` SET `saved_players` = @saved_players WHERE `id` = @id", {
-            ['@saved_players'] = json.encode(property.saved_players),
-            ['@id'] = property.id
-        })
+        if db == 'ox' then
+            MySQL.update("UPDATE `bnl_housing` SET `saved_players` = @saved_players WHERE `id` = @id", {
+                ['@saved_players'] = json.encode(property.saved_players),
+                ['@id'] = property.id
+            })
+        elseif db == 'async' then
+            MySQL.Async.execute("UPDATE bnl_housing SET saved_players = @saved_players WHERE id = @id", {
+                ['@saved_players'] = json.encode(property.saved_players),
+                ['@id'] = property.id
+            })
+        end
 
         PlayerEnterProperty(property, {
             identifier = playerIdentifier,

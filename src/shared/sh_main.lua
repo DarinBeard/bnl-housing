@@ -1,3 +1,5 @@
+db = 'async' --or ox if using oxsql
+
 lib.locale()
 resource = GetCurrentResourceName()
 

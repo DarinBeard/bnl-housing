@@ -10,8 +10,8 @@ description     'Simple player property system'
 
 dependencies {
 	'/onesync',
-	'ox_lib',
-	'oxmysql',
+--	'ox_lib', --uncomment this for oxsql
+--	'oxmysql', --uncomment this for oxsql
 }
 
 shared_scripts {
@@ -26,7 +26,8 @@ client_scripts {
 }
 
 server_scripts {
-	'@oxmysql/lib/MySQL.lua',
+--	'@oxmysql/lib/MySQL.lua', --uncomment this for oxsql
+	'@mysql-async/lib/MySQL.lua', --uncomment this for mysql.async
 
 	'src/server/sv_main.lua',
 	'src/server/sv_functions.lua',

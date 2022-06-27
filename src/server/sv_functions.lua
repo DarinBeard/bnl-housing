@@ -320,10 +320,18 @@ function SavePropertyVehicles(property)
     if (next(savedVehicles) ~= nil) then
         property.saved_vehicles = savedVehicles
 
-        MySQL.update("UPDATE `bnl_housing` SET `vehicles` = @vehicles WHERE `id` = @id", {
-            ['@vehicles'] = json.encode(property.saved_vehicles),
-            ['@id'] = property.id
-        })
+        if db == 'ox' then
+            MySQL.update("UPDATE `bnl_housing` SET `vehicles` = @vehicles WHERE `id` = @id", {
+                ['@vehicles'] = json.encode(property.saved_vehicles),
+                ['@id'] = property.id
+            })
+        elseif db == 'async' then
+            MySQL.Async.execute("UPDATE bnl_housing SET vehicles = @vehicles, WHERE id = @id", {
+                ["@vehicles"] = json.encode(property.saved_vehicles), 
+                ["@id"] = property.id
+            })
+        end
+
     end
 
     UpdateProperty(property)
@@ -395,11 +403,17 @@ function UpdatePropertyProp(property, prop)
         end
     end
 
-    MySQL.update("UPDATE `bnl_housing` SET `decoration` = @decoration WHERE `id` = @id", {
-        ['@decoration'] = json.encode(property.decoration),
-        ['@id'] = property.id
-    })
-
+    if db == 'ox' then
+        MySQL.update("UPDATE `bnl_housing` SET `decoration` = @decoration WHERE `id` = @id", {
+            ['@decoration'] = json.encode(property.decoration),
+            ['@id'] = property.id
+        })
+    elseif db == 'async' then
+        MySQL.Async.execute("UPDATE bnl_housing SET decoration = @decoration WHERE id = @id", {
+            ['@decoration'] = json.encode(property.decoration),
+            ['@id'] = property.id
+        })
+    end
     UpdateProperty(property)
 end
 
